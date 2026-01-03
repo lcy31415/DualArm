@@ -6,7 +6,7 @@ def train_model():
 
     # 2. 开始训练
     results = model.train(
-        data=r'C:\Users\LCY\Desktop\eye\dataset\data.yaml', 
+        data=r'E:\DualArm\Camera_Module\dataset\data.yaml', 
         epochs=100,
         imgsz=640,
         device=0,

@@ -1,7 +1,7 @@
 task: obb
 mode: train
 model: yolov8n-obb.pt
-data: C:\Users\LCY\Desktop\eye\dataset\data.yaml
+data: E:\DualArm\Camera_Module\dataset\data.yaml
 epochs: 100
 time: null
 patience: 100
@@ -13,7 +13,7 @@ cache: false
 device: 0
 workers: 4
 project: null
-name: train3
+name: train2
 exist_ok: false
 pretrained: true
 optimizer: auto
@@ -104,4 +104,4 @@ erasing: 0.4
 crop_fraction: 1.0
 cfg: null
 tracker: botsort.yaml
-save_dir: runs\obb\train3
+save_dir: runs\obb\train2

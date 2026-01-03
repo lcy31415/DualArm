@@ -3,7 +3,7 @@ import math
 from ultralytics import YOLO
 
 # 1. 加载模型
-model = YOLO('runs/obb/train/weights/best.pt')
+model = YOLO(r'Camera_Module\runs\obb\train\weights\best.pt')
 
 # 2. 打开摄像头
 # 如果 0 不行，请尝试 1 或 2；CAP_DSHOW 在 Windows 上通常比 MSMF 更稳定

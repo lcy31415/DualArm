@@ -1,8 +1,8 @@
 
-Pen Detection - v3 2025-12-21 1:25pm
+Pen Detection - v4 2026-01-03 7:55pm
 ==============================
 
-This dataset was exported via roboflow.com on December 21, 2025 at 5:28 AM GMT
+This dataset was exported via roboflow.com on January 3, 2026 at 11:55 AM GMT
 
 Roboflow is an end-to-end computer vision platform that helps you
 * collaborate with your team on computer vision projects
@@ -17,13 +17,13 @@ visit https://github.com/roboflow/notebooks
 
 To find over 100k other datasets and pre-trained models, visit https://universe.roboflow.com
 
-The dataset includes 844 images.
+The dataset includes 115 images.
 Objects are annotated in YOLOv8 Oriented Object Detection format.
 
 The following pre-processing was applied to each image:
 * Resize to 640x480 (Stretch)
 
-The following augmentation was applied to create 2 versions of each source image:
+The following augmentation was applied to create 3 versions of each source image:
 * Random rotation of between -15 and +15 degrees
 
 
