@@ -31,16 +31,19 @@ if state == dType.DobotConnect.DobotConnect_NoError:
     dType.SetPTPCommonParams(api, 50, 50, isQueued=1)
     dType.SetPTPJointParams(api, 100, 100, 100, 100, 100, 100, 100, 100, isQueued=1)
 
-    # 6. 下发一个简单的相对运动 (例如 Z 轴向上抬升 20mm)
-    # 使用相对坐标模式 PTPMOVJXYZINCMode 比较安全
-    print("正在尝试小范围移动 (Z+20)...")
-    last_index = dType.SetPTPCmd(api, dType.PTPMode.PTPMOVJXYZINCMode, 0, 0, 20, 0, isQueued=1)[0]
+    # 6. 回零后移动到指定点位并抓夹，保持10秒后松开
+    target = (181.0382843017578, 29.961204528808594, 6.1058349609375, 9.397076606750488)
+    print(f"移动到目标点位: X={target[0]:.3f} Y={target[1]:.3f} Z={target[2]:.3f} R={target[3]:.3f}")
+    idx_move = dType.SetPTPCmd(api, dType.PTPMode.PTPMOVJXYZMode, target[0], target[1], target[2], target[3], isQueued=1)[0]
+    idx_grip_on = dType.SetEndEffectorGripper(api, 1, 1, isQueued=1)[0]
+    idx_hold = dType.SetWAITCmd(api, 10000, isQueued=1)[0]
+    last_index = dType.SetEndEffectorGripper(api, 1, 0, isQueued=1)[0]
 
     # 等待执行
     while last_index > dType.GetQueuedCmdCurrentIndex(api)[0]:
         dType.dSleep(100)
 
-    print("测试运动执行完毕！")
+    print("夹取动作完成，已保持10秒并松开抓夹。")
 
     # 7. 断开连接
     dType.SetQueuedCmdStopExec(api)
