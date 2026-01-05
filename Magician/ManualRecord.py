@@ -52,21 +52,7 @@ def calculate_distance(p1, p2):
     return math.sqrt((p1[0]-p2[0])**2 + (p1[1]-p2[1])**2 + (p1[2]-p2[2])**2)
 
 def save_record(frame, pose, count):
-    """保存图片和数据"""
-    img_filename = f"manual_{count}.jpg"
-    img_path = os.path.join(IMAGE_DIR, img_filename)
-    
-    # 保存图片
-    cv2.imwrite(img_path, frame)
-    
-    # 保存数据
-    with open(POSE_FILE, "a") as f:
-        # 如果文件为空，先写表头
-        if os.stat(POSE_FILE).st_size == 0:
-            f.write("image_name,x,y,z,r\n")
-        f.write(f"{img_filename},{pose[0]:.4f},{pose[1]:.4f},{pose[2]:.4f},{pose[3]:.4f}\n")
-    
-    print(f"\n[记录成功 #{count}] 位置: {pose} -> {img_filename}")
+    print(f"\n[坐标 #{count}] X:{pose[0]:.4f} Y:{pose[1]:.4f} Z:{pose[2]:.4f} R:{pose[3]:.4f}")
 
 def main():
     if not init_dobot():
@@ -100,7 +86,7 @@ def main():
     print("  操作说明：")
     print("  1. 按住机械臂 Unlock 键，拖动到目标位置")
     print("  2. 松开 Unlock 键，保持静止约 1 秒")
-    print("  3. 程序将自动保存当前图片和坐标")
+    print("  3. 程序将自动显示当前坐标（不保存）")
     print("  按 'q' 退出程序")
     print("---------------------------------------------------\n")
 
@@ -156,7 +142,7 @@ def main():
             key = cv2.waitKey(10) & 0xFF
             if key == ord('q'):
                 break
-            elif key == 32: # Space 键强制保存
+            elif key == ord('s'):
                 record_count += 1
                 save_record(frame, curr_pose_snapshot, record_count)
 

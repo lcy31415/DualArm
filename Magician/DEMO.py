@@ -31,19 +31,24 @@ if state == dType.DobotConnect.DobotConnect_NoError:
     dType.SetPTPCommonParams(api, 50, 50, isQueued=1)
     dType.SetPTPJointParams(api, 100, 100, 100, 100, 100, 100, 100, 100, isQueued=1)
 
-    # 6. 回零后移动到指定点位并抓夹，保持10秒后松开
-    target = (181.0382843017578, 29.961204528808594, 6.1058349609375, 9.397076606750488)
-    print(f"移动到目标点位: X={target[0]:.3f} Y={target[1]:.3f} Z={target[2]:.3f} R={target[3]:.3f}")
-    idx_move = dType.SetPTPCmd(api, dType.PTPMode.PTPMOVJXYZMode, target[0], target[1], target[2], target[3], isQueued=1)[0]
-    idx_grip_on = dType.SetEndEffectorGripper(api, 1, 1, isQueued=1)[0]
-    idx_hold = dType.SetWAITCmd(api, 10000, isQueued=1)[0]
-    last_index = dType.SetEndEffectorGripper(api, 1, 0, isQueued=1)[0]
+    # 6. 选择三个不同位置，到位后依次旋转到 0、90、-90、0 度
+    positions = [
+        (181.0382843017578, 29.961204528808594, 6.1058349609375),
+    ]
+    sequence = [0.0, 90.0, -90.0, 0.0]
+    for x, y, z in positions:
+        print(f"移动到目标点位: X={x:.3f} Y={y:.3f} Z={z:.3f} R=0.000")
+        idx_move = dType.SetPTPCmd(api, dType.PTPMode.PTPMOVJXYZMode, x, y, z, 0.0, isQueued=1)[0]
+        last_index = idx_move
+        for r in sequence:
+            last_index = dType.SetPTPCmd(api, dType.PTPMode.PTPMOVJXYZMode, x, y, z, r, isQueued=1)[0]
+            dType.SetWAITCmd(api, 300, isQueued=1)
 
     # 等待执行
     while last_index > dType.GetQueuedCmdCurrentIndex(api)[0]:
         dType.dSleep(100)
 
-    print("夹取动作完成，已保持10秒并松开抓夹。")
+    print("已在三个位置完成抓夹 0/90/-90/0 旋转。")
 
     # 7. 断开连接
     dType.SetQueuedCmdStopExec(api)

@@ -6,20 +6,20 @@ import random
 
 # ---------------- 配置参数 ----------------
 # 初始位置 (X, Y, Z, R)
-INIT_POSE = [181.038, 29.961, 6.106, 9.397]
+INIT_POSE = [230, 0, 140, 0]
 # 采集数量
 CAPTURE_COUNT = 15
 # 每个位置停留时间 (秒)
-WAIT_TIME = 5
+WAIT_TIME = 4
 # 位姿变化范围 (mm 和 度)
 OFFSET_RANGE = {
-    'x': (-15, 15),
+    'x': (-15, 20),
     'y': (-15, 15),
-    'z': (0, 10),   # Z轴只向上微调，防止撞击
-    'r': (-10, 10)
+    'z': (0, 15),   # Z轴只向上微调，防止撞击
+    'r': (-30, 30)
 }
 # 数据保存路径
-DATA_DIR = "try_calibration_data"
+DATA_DIR = "calibration_data"
 IMAGE_DIR = os.path.join(DATA_DIR, "images")
 POSE_FILE = os.path.join(DATA_DIR, "poses.txt")
 
