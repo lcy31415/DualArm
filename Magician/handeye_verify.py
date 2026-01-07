@@ -70,6 +70,7 @@ def main():
     cam = np.load(cam_params_path)
     mtx = cam["mtx"].astype(np.float64)
     dist = cam["dist"].astype(np.float64)
+    flip_y = True
 
     pattern_size = (3,3)
     square = 25.0
@@ -102,6 +103,8 @@ def main():
         pc = Rb2c @ c.reshape(3,1) + tb2c
         pb = Rc2b @ pc + tc2b.reshape(3,1)
         x, y = float(pb[0]), float(pb[1])
+        if flip_y:
+            y = -y
         print(f"目标{k}: 棋盘点({c[0]:.1f},{c[1]:.1f}) → 基座({x:.2f},{y:.2f},{approach_z:.2f})")
         idx1 = dType.SetPTPCmd(api, dType.PTPMode.PTPMOVJXYZMode, x, y, approach_z, 0.0, isQueued=1)[0]
         print(f"下发移动指令，队列索引: {idx1}")
@@ -115,4 +118,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

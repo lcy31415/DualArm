@@ -36,6 +36,7 @@ def main():
             if len(parts) < 4: continue
             obj_pts.append([float(parts[1]), float(parts[2]), float(parts[3])])
     obj_pts = np.array(obj_pts, dtype=np.float64)
+    obj_pts[:,1] = -obj_pts[:,1]
 
     img = None
     for fn in sorted(os.listdir(images_dir)):
