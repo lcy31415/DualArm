@@ -19,8 +19,9 @@ objp = objp * SQUARE_SIZE
 objpoints = [] # 3d points
 imgpoints = [] # 2d points
 
-# 加上 *.jpg 或 *.png 或 *.bmp，取决于你 AMCap 存的是什么格式
-images = glob.glob(r'E:\DualArm\Magician\calibration\*.png')
+# 标定图片读取路径（重命名后的新目录）
+# 将棋盘图片放在 E:\DualArm\Hand-Eye_Calibration\camera_calibration\ 下
+images = glob.glob(r'E:\DualArm\Hand-Eye_Calibration\camera_calibration\*.png')
 
 if not images:
     print("没有找到图片，请确认路径是否正确！")
@@ -56,6 +57,7 @@ if len(objpoints) > 0:
     print(f"平均重投影误差: {ret}") # 越接近0说明越准，一般应小于0.5
     
     # 保存内参
-    np.savez("camera_params.npz", mtx=mtx, dist=dist)
+    # 将相机内参保存到根目录，供手眼标定与验证脚本统一读取
+    np.savez(r"E:\DualArm\camera_params.npz", mtx=mtx, dist=dist)
 else:
     print("标定失败：没有任何一张图片被成功识别角点。请检查 CHESSBOARD_SIZE 是否设置正确。")

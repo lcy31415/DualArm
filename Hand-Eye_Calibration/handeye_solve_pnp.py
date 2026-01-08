@@ -12,9 +12,11 @@ def yaw_from_R(R):
 
 def main():
     base_dir = os.path.dirname(__file__)
-    images_dir = os.path.join(base_dir, "calibration_data", "images")
-    points3d_csv = os.path.join(base_dir, "calibration_data", "points_3d.csv")
-    cam_npz = os.path.join(base_dir, "camera_params.npz")
+    root_dir = os.path.abspath(os.path.join(base_dir, ".."))
+    # 读取采集到的3D点与对应棋盘图像（重命名后的新目录）
+    images_dir = os.path.join(base_dir, "handeye_calibration", "images")
+    points3d_csv = os.path.join(base_dir, "handeye_calibration", "points_3d.csv")
+    cam_npz = os.path.join(root_dir, "camera_params.npz")
 
     if not os.path.exists(points3d_csv):
         raise SystemExit("缺少3D点文件 calibration_data/points_3d.csv （每行: idx,x,y,z）")
@@ -36,6 +38,7 @@ def main():
             if len(parts) < 4: continue
             obj_pts.append([float(parts[1]), float(parts[2]), float(parts[3])])
     obj_pts = np.array(obj_pts, dtype=np.float64)
+    # 若机械臂基座坐标系的Y轴方向与视觉映射的Y相反，则对Y取反以修正左右颠倒
     obj_pts[:,1] = -obj_pts[:,1]
 
     img = None
@@ -60,16 +63,17 @@ def main():
         raise SystemExit("3D点与2D点数量不一致")
 
     flag = cv2.SOLVEPNP_IPPE_SQUARE if obj_pts.shape[0] == 4 else cv2.SOLVEPNP_IPPE
-    # 优先使用平面 IPPE（归一化坐标 + 单位相机矩阵）
+    # 优先使用平面 IPPE：使用去畸变归一化后像素坐标 + 单位相机矩阵I
     I = np.eye(3, dtype=np.float64)
     ok, rvec, tvec = cv2.solvePnP(obj_pts, img_pts_norm, I, None, flags=flag)
     if not ok:
-        # 回退到通用迭代（像素坐标 + 畸变参数）
+        # 回退到通用迭代：使用原始像素坐标 + 相机内参与畸变
         ok, rvec, tvec = cv2.solvePnP(obj_pts, img_pts, mtx, dist, flags=cv2.SOLVEPNP_ITERATIVE)
     if not ok:
         raise SystemExit("PnP求解失败")
     R,_ = cv2.Rodrigues(rvec)
     yaw = yaw_from_R(R)
+    # 仅保留Z轴旋转（视野内平面假设），得到 Camera->Base 的旋转矩阵
     Rc2b = Rz(yaw)
     tc2b = tvec.reshape(3,1)
 
@@ -83,7 +87,8 @@ def main():
     rmse = np.sqrt(np.mean(np.sum((proj - img_pts)**2, axis=1)))
     print("重投影RMSE(像素):", float(rmse))
 
-    out_path = os.path.join(base_dir, "handeye_result.npz")
+    # 将手眼标定结果保存至根目录，供验证脚本统一读取
+    out_path = os.path.join(root_dir, "handeye_result.npz")
     np.savez(out_path, Rc2b=Rc2b, tc2b=tc2b)
     print("已保存: ", out_path)
 

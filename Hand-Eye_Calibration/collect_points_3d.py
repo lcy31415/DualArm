@@ -12,7 +12,8 @@ def ensure_dir(p):
 
 def main():
     base_dir = os.path.dirname(__file__)
-    out_dir = os.path.join(base_dir, "calibration_data")
+    # 重命名后的标定数据目录：handeye_calibration
+    out_dir = os.path.join(base_dir, "handeye_calibration")
     ensure_dir(out_dir)
     out_csv = os.path.join(out_dir, "points_3d.csv")
 
@@ -43,6 +44,7 @@ def main():
                 color = (0,255,0) if k!=idx else (0,0,255)
                 cv2.circle(frame, (int(c[0]), int(c[1])), 6, color, -1)
                 cv2.putText(frame, str(k), (int(c[0])+5, int(c[1])-5), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255,255,0), 2)
+        # 显示角点索引与操作提示：r记录当前角点的机械臂位姿，n/b切换角点，s保存数据，q退出
         cv2.putText(frame, f"Corner {idx}/{len(points)-1}", (10,30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255,255,255), 2)
         cv2.putText(frame, "r: record pose for current corner", (10,60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255,255,0), 2)
         cv2.putText(frame, "n/b: next/back corner | s: save | q: quit", (10,85), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255,255,0), 2)
@@ -59,6 +61,7 @@ def main():
             idx = max(idx-1, 0)
         if key == ord('r'):
             pose = dType.GetPose(api)
+            # 记录当前机械臂末端位姿（单位：mm，坐标系为基座系）
             points[idx] = (float(pose[0]), float(pose[1]), float(pose[2]))
             idx = min(idx+1, len(points)-1)
         if key == ord('s'):

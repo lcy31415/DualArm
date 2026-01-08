@@ -23,6 +23,7 @@ def acquire_Tb2c(cap, pattern_size, objp, mtx, dist, criteria):
         if ok:
             corners = cv2.cornerSubPix(gray, corners, (11,11), (-1,-1), criteria)
             I = np.eye(3, dtype=np.float64)
+            # 将像素坐标去畸变并归一化，减少畸变对位姿求解的影响
             und = cv2.undistortPoints(corners, mtx, dist)
             flag = cv2.SOLVEPNP_IPPE if objp.shape[0] >= 4 else cv2.SOLVEPNP_ITERATIVE
             ok2, rvec, tvec = cv2.solvePnP(objp, und.reshape(-1,2), I, None, flags=flag)
@@ -58,8 +59,10 @@ def main():
     wait_idx(api, idx)
     print(f"已移动到基准位姿: ({base_x:.2f}, {base_y:.2f}, {base_z:.2f}, {base_r:.2f})")
 
-    calib_path = os.path.join(os.path.dirname(__file__), "handeye_result.npz")
-    cam_params_path = os.path.join(os.path.dirname(__file__), "camera_params.npz")
+    base_dir = os.path.dirname(__file__)
+    root_dir = os.path.abspath(os.path.join(base_dir, ".."))
+    calib_path = os.path.join(root_dir, "handeye_result.npz")
+    cam_params_path = os.path.join(root_dir, "camera_params.npz")
     if not (os.path.exists(calib_path) and os.path.exists(cam_params_path)):
         print("缺少 handeye_result.npz 或 camera_params.npz")
         dType.DisconnectDobot(api)
@@ -100,6 +103,7 @@ def main():
     approach_z = 10.0
     targets = objp.reshape(-1,3)
     for k, c in enumerate(targets):
+        # 将棋盘上角点坐标c（棋盘平面坐标系）经相机坐标到基座坐标的链式变换得到基座系坐标pb
         pc = Rb2c @ c.reshape(3,1) + tb2c
         pb = Rc2b @ pc + tc2b.reshape(3,1)
         x, y = float(pb[0]), float(pb[1])
