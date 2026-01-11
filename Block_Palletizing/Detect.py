@@ -3,7 +3,7 @@ import numpy as np
 import os
 import json
 import time
-from config import COORDINATES_FILE
+from config import COORDINATES_FILE, COMMAND_FILE
 
 # ====================== 可调参数（“置信度”相关） ======================
 # 最小面积阈值：用于过滤噪声/小块，数值越大检测越严格
@@ -15,7 +15,7 @@ MIN_SAT = 100
 # 亮度下限：越大越严格（画面偏暗时可适当降低）
 MIN_VAL = 80
 # 形状近似阈值：轮廓近似的精度（占周长比例）
-APPROX_EPS_RATIO = 0.05
+APPROX_EPS_RATIO = 0.02
 ASPECT_TOL = 0.3
 MIN_VERTICES = 4
 MAX_VERTICES = 8
@@ -37,7 +37,7 @@ def open_camera():
 
 def color_masks(hsv):
     # red
-    lower_red1 = np.array([0, 134, 93])
+    lower_red1 = np.array([0, 122, 83])
     upper_red1 = np.array([14, 255, 255])
     lower_red2 = np.array([170, 100, 70])
     upper_red2 = np.array([180, 255, 255])
@@ -107,26 +107,8 @@ def draw_blocks(frame, hsv, prev_centers, last_angles):
             else:
                 r = cv2.minAreaRect(c)
                 cx, cy = int(r[0][0]), int(r[0][1])
-            # 计算方向角（以 y 轴为正方向，逆时针为正）：使用最小外接矩形，并归一化到 [-45,45]
             rect = cv2.minAreaRect(c)
-            box = cv2.boxPoints(rect).astype(np.float32)
-            max_len = -1.0
-            angle_deg = 0.0
-            for i in range(4):
-                p1 = box[i]
-                p2 = box[(i+1) % 4]
-                dx = float(p2[0] - p1[0])
-                dy = float(p2[1] - p1[1])
-                L = dx*dx + dy*dy
-                if L > max_len:
-                    max_len = L
-                    # 以 y 轴为参考：atan2(vx, vy)
-                    angle_deg = float(np.degrees(np.arctan2(dx, dy)))
-            # 角度归一化到 [-45, 45]
-            if angle_deg < -45.0:
-                angle_deg += 90.0
-            elif angle_deg > 45.0:
-                angle_deg -= 90.0
+            angle_deg = -float(rect[2])
             # 角度时域滤波（移动平均）
             angle_deg = float(smooth_angle(name, angle_deg, last_angles))
             # 中心像素稳定：若变化小于阈值则保持上次中心
@@ -143,32 +125,65 @@ def draw_blocks(frame, hsv, prev_centers, last_angles):
             blocks.append({"color": name, "x": float(cx), "y": float(cy), "angle": float(angle_deg)})
     return frame, blocks
 
+def check_command():
+    if not os.path.exists(COMMAND_FILE):
+        return "idle"
+    try:
+        with open(COMMAND_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            return data.get("command", "idle")
+    except Exception:
+        return "idle"
+
+def set_command(cmd):
+    try:
+        with open(COMMAND_FILE, "w", encoding="utf-8") as f:
+            json.dump({"command": cmd}, f)
+    except Exception:
+        pass
+
 def main():
     cap = open_camera()
     if cap is None:
         print("摄像头打开失败")
         return
-    print("摄像头预览启动")
+    print("摄像头预览启动，等待机械臂指令...")
+    
+    # 确保初始状态为 idle
+    set_command("idle")
+    
     saved = False
     stable_counter = 0
     blocks_prev = []
+    
     while True:
         ret, frame = cap.read()
         if not ret:
             cv2.waitKey(10)
             continue
+            
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
         if 'prev_centers' not in globals():
             prev_centers = {}
         if 'last_angles' not in globals():
             last_angles = {}
+            
         out, blocks = draw_blocks(frame, hsv, prev_centers, last_angles)
-        if not saved:
-            # 当前帧与上一帧按颜色进行近邻匹配，所有当前块在 STABLE_TOL 内则记为稳定
+        
+        # 读取当前指令
+        current_cmd = check_command()
+        
+        # 只有当指令为 detect 时才进行稳定性判断和写入
+        if current_cmd == "detect":
+            # 如果刚进入 detect 状态（saved=True表示上一轮刚结束，这里需要重置状态）
+            # 但这里简化处理：只要是 detect 且没保存过，就进行判断
+            
+            # 当前帧与上一帧按颜色进行近邻匹配
             stable = True
             by_color_prev = {}
             for b in blocks_prev:
                 by_color_prev.setdefault(b["color"], []).append((b["x"], b["y"]))
+            
             for b in blocks:
                 color = b["color"]
                 cx, cy = b["x"], b["y"]
@@ -179,9 +194,27 @@ def main():
                 if min(dists) >= STABLE_TOL:
                     stable = False
                     break
+            
+            # 如果物体数量变化，也不稳定
+            if len(blocks) != len(blocks_prev):
+                stable = False
+                
             blocks_prev = [{"color": b["color"], "x": b["x"], "y": b["y"]} for b in blocks]
-            stable_counter = stable_counter + 1 if stable else 0
-            if stable and stable_counter >= STABLE_FRAMES and len(blocks) > 0:
+            
+            if stable:
+                stable_counter += 1
+            else:
+                stable_counter = 0
+                
+            # 屏幕提示状态
+            cv2.putText(out, f"Scanning... {stable_counter}/{STABLE_FRAMES}", (10, 30), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+
+            if stable and stable_counter >= STABLE_FRAMES:
+                # 即使没有物块 detected，只要稳定也应该返回（空列表），防止无限等待
+                # 但通常至少等有方块？不，如果桌上没方块，也应该返回 done。
+                # 这里的逻辑假设是“等待画面稳定”。
+                
                 try:
                     os.makedirs(os.path.dirname(COORDINATES_FILE), exist_ok=True)
                     data = {"timestamp": time.time(), "blocks": blocks}
@@ -189,13 +222,22 @@ def main():
                     with open(tmp, "w", encoding="utf-8") as f:
                         json.dump(data, f, ensure_ascii=False, indent=2)
                     os.replace(tmp, COORDINATES_FILE)
-                    saved = True
+                    
                     print(f"检测稳定，已写入 {len(blocks)} 个小物块")
-                except Exception:
-                    pass
+                    set_command("done") # 通知机械臂完成
+                    stable_counter = 0 # 重置计数器
+                except Exception as e:
+                    print(f"写入文件失败: {e}")
+        else:
+            # IDLE or DONE 状态
+            stable_counter = 0
+            cv2.putText(out, f"Status: {current_cmd.upper()}", (10, 30), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+
         cv2.imshow("Detect", out)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
+            
     cap.release()
     cv2.destroyAllWindows()
 

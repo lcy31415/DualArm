@@ -15,15 +15,15 @@ PLACE_POSITIONS = {
 
 Z_WORKPLANE = 0.0
 APPROACH_Z = 30.0
-PICK_Z = -10.0
-PLACE_Z = -12.0
+PICK_Z = -18.0
+PLACE_Z = -18.0
 FLIP_Y = True
-
-TIMEOUT_DETECT = 8.0
-TIMEOUT_ARM = 60.0
 
 CAMERA_PARAMS_PATH = os.path.join(ROOT_DIR, "camera_params.npz")
 HANDEYE_RESULT_PATH = os.path.join(ROOT_DIR, "handeye_result.npz")
 COORDINATES_FILE = os.path.join(BASE_DIR, "data", "coordinates.json")
+COMMAND_FILE = os.path.join(BASE_DIR, "data", "command.json")
+
 USE_GRIPPER = True
 USE_SUCTION = False
+GRAB_R = 0.0

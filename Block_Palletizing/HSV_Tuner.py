@@ -56,7 +56,7 @@ def apply_mask(hsv, low1, high1, low2, high2):
 
 DEFAULTS = {
     "red": {
-        "low1": [0, 100, 70], "high1": [10, 255, 255],
+        "low1": [0, 122, 83], "high1": [14, 255, 255],
         "low2": [170, 100, 70], "high2": [180, 255, 255]
     },
     "green": {
