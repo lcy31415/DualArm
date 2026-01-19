@@ -2,77 +2,98 @@ import os
 import cv2
 import numpy as np
 
-def load_params():
-    root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    cam = np.load(os.path.join(root, "camera_params.npz"))
-    he = np.load(os.path.join(root, "handeye_result.npz"))
-    mtx = cam["mtx"].astype(np.float64)
-    dist = cam["dist"].astype(np.float64)
-    Rc2b = he["Rc2b"].astype(np.float64)
-    tc2b = he["tc2b"].astype(np.float64)
-    return mtx, dist, Rc2b, tc2b
-
-H = 762.0
-
-def pixel_to_base_xy(cx, cy, mtx, dist, Rc2b, tc2b, cz=0.0, flip_y=True):
-    pt = np.array([[[float(cx), float(cy)]]], dtype=np.float64)
-    und = cv2.undistortPoints(pt, mtx, dist).reshape(-1,2)
-    xn, yn = float(und[0,0]), float(und[0,1])
-    dir_c = np.array([xn, yn, 1.0], dtype=np.float64).reshape(3,1)
-    dir_b = Rc2b @ dir_c
-    org_b = tc2b.reshape(3,1)
-    dz = float(dir_b[2,0])
-    oz = float(org_b[2,0])
-    if dz == 0.0:
+def load_dual_affine_matrices():
+    base_dir = os.path.dirname(__file__)
+    matrix_path = os.path.join(base_dir, "affine_matrix_dual.npz")
+    
+    if not os.path.exists(matrix_path):
+        print(f"找不到矩阵文件: {matrix_path}")
         return None
-    t = (H - oz)/dz
-    pb = org_b + t*dir_b
-    x, y = float(pb[0,0]), float(pb[1,0])
-    if flip_y:
-        y = -y
-    return x, y, float(cz)
+    
+    data = np.load(matrix_path)
+    matrices = {}
+    if 'affine_left' in data:
+        matrices['left'] = data['affine_left']
+    if 'affine_right' in data:
+        matrices['right'] = data['affine_right']
+        
+    return matrices
+
+def pixel_to_base_affine(u, v, M):
+    """
+    使用仿射矩阵进行变换
+    [x, y] = M * [u, v, 1]^T
+    """
+    vec = np.array([u, v, 1.0])
+    res = M @ vec
+    return float(res[0]), float(res[1])
+
+def on_mouse(event, x, y, flags, param):
+    """
+    鼠标回调：点击画面获取坐标
+    """
+    if event == cv2.EVENT_LBUTTONDOWN:
+        param['clicked_uv'] = (float(x), float(y))
+        param['update'] = True
 
 def main():
-    global H
-    mtx, dist, Rc2b, tc2b = load_params()
-    print("标定数据加载成功。")
-    print(f"当前几何计算平面高度设定为 H = {H:.1f} mm")
-    z_in = input("请输入机械臂Z高度(mm)，回车默认0: ").strip()
-    z_val = 0.0 if z_in == "" else float(z_in)
-    pix = input("请输入像素坐标 'u v'，回车退出: ").strip()
-    if not pix:
+    matrices = load_dual_affine_matrices()
+    if not matrices:
+        print("未加载到任何有效矩阵，程序退出。")
         return
-    parts = pix.split()
-    if len(parts) < 2:
+
+    print("已加载矩阵: ", list(matrices.keys()))
+    
+    # 打开摄像头
+    cap = cv2.VideoCapture(1)
+    if not cap.isOpened():
+        print("无法打开摄像头")
         return
-    try:
-        cx = float(parts[0]); cy = float(parts[1])
-    except:
-        return
-    win = "H Tuner"
-    cv2.namedWindow(win)
-    cv2.createTrackbar("H(mm)", win, int(H), 2000, lambda x: None)
-    last_h = -1
-    canvas = np.zeros((240, 800, 3), dtype=np.uint8)
+
+    # 状态字典，用于鼠标回调通信
+    state = {
+        'clicked_uv': None,
+        'update': False
+    }
+
+    win_name = "H Determination (Click to Measure)"
+    cv2.namedWindow(win_name)
+    cv2.setMouseCallback(win_name, on_mouse, state)
+    
+    print("\n操作说明:")
+    print("1. 在画面上点击任意位置，查看该点在机械臂坐标系下的计算值")
+    print("2. 仿射变换矩阵已经包含了几何关系，不需要额外调整 H 参数")
+    print("3. 按 'q' 退出")
+
     while True:
-        h_now = cv2.getTrackbarPos("H(mm)", win)
-        if h_now != last_h:
-            H = float(h_now)
-            res = pixel_to_base_xy(cx, cy, mtx, dist, Rc2b, tc2b, cz=z_val, flip_y=True)
-            canvas[:] = 0
-            if res is None:
-                cv2.putText(canvas, "转换失败", (20,120), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0,0,255), 2)
-            else:
-                x, y, zz = res
-                text1 = f"H={H:.1f} mm  Z={zz:.1f} mm"
-                text2 = f"Pixel({cx:.1f},{cy:.1f}) -> Base({x:.2f},{y:.2f},{zz:.2f})"
-                cv2.putText(canvas, text1, (20,80), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0,255,0), 2)
-                cv2.putText(canvas, text2, (20,140), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255,255,255), 2)
-                print(f"像素({cx:.1f}, {cy:.1f}) -> 机械臂({x:.2f}, {y:.2f}, {zz:.2f})")
-            last_h = h_now
-        cv2.imshow(win, canvas)
-        if (cv2.waitKey(30) & 0xFF) == ord('q'):
+        ret, frame = cap.read()
+        if not ret:
+            continue
+            
+        display_frame = frame.copy()
+        
+        # 如果有点击点，绘制出来
+        if state['clicked_uv']:
+            u, v = state['clicked_uv']
+            cv2.circle(display_frame, (int(u), int(v)), 5, (0, 0, 255), -1)
+            
+            # 计算并显示坐标
+            y_offset = 30
+            for arm_name, M in matrices.items():
+                if M is not None:
+                    rx, ry = pixel_to_base_affine(u, v, M)
+                    text = f"{arm_name.upper()}: ({rx:.1f}, {ry:.1f})"
+                    cv2.putText(display_frame, text, (int(u)+10, int(v)+y_offset), 
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+                    y_offset += 25
+
+        cv2.imshow(win_name, display_frame)
+        
+        key = cv2.waitKey(10) & 0xFF
+        if key == ord('q'):
             break
+
+    cap.release()
     cv2.destroyAllWindows()
 
 if __name__ == "__main__":

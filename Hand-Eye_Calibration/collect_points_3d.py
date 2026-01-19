@@ -15,12 +15,27 @@ def main():
     # 重命名后的标定数据目录：handeye_calibration
     out_dir = os.path.join(base_dir, "handeye_calibration")
     ensure_dir(out_dir)
-    out_csv = os.path.join(out_dir, "points_3d.csv")
+    
+    # 询问用户是采集左臂还是右臂
+    arm_type = input("请输入当前采集的机械臂 (left/right): ").strip().lower()
+    if arm_type not in ["left", "right"]:
+        print("无效输入，默认为 left")
+        arm_type = "left"
+        
+    out_csv = os.path.join(out_dir, f"points_3d_{arm_type}.csv")
 
+    # 在此处修改串口号，例如 "COM5" 或 "COM6"
+    # PORT = "COM9" 
+    PORT = input(f"请输入 {arm_type} 臂的串口号 (例如 COM9): ").strip().upper()
+    if not PORT:
+        PORT = "COM9"
+    
     api = dType.load()
-    state = dType.ConnectDobot(api, "", 115200)[0]
+    state = dType.ConnectDobot(api, PORT, 115200)[0]
     if state != dType.DobotConnect.DobotConnect_NoError:
+        print(f"连接失败: {PORT}")
         return
+    print(f"连接成功: {PORT}")
     dType.SetQueuedCmdClear(api)
     dType.SetQueuedCmdStartExec(api)
 
